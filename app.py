@@ -4,6 +4,8 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 import tempfile
+import app_extensions
+
 
 st.set_page_config(page_title="Job Status Completion", layout="centered")
 
