@@ -35,18 +35,20 @@ if uploaded_file is not None:
         status_column = find_status_column(df)
 
         if status_column is None:
-            st.error("No Status column found. Column must be named Status, status, M, or M1.")
+            st.error(
+                "No Status column found. Column must be named Status, status, M, or M1."
+            )
         else:
             results, overall_completion, completed_jobs, total_jobs = (
                 ext.calculate_status_metrics(df, status_column)
             )
 
-            # Display table
+            # Display results table
             st.subheader("Status Breakdown")
             results_df = pd.DataFrame(
                 results, columns=["Status", "Jobs", "Percentage (%)"]
             )
-            st.dataframe(results_df, use_container_width=True)
+            st.dataframe(results_df, width="stretch")
 
             # Overall completion
             st.metric(
@@ -54,7 +56,7 @@ if uploaded_file is not None:
                 value=f"{round(overall_completion, 2)}%"
             )
 
-            # Export PDF
+            # PDF Export
             st.subheader("Export Report")
 
             if st.button("Export Results as PDF"):
@@ -69,12 +71,4 @@ if uploaded_file is not None:
                 )
 
                 with open(pdf_path, "rb") as f:
-                    st.download_button(
-                        label="Download PDF Report",
-                        data=f,
-                        file_name="job_status_completion_report.pdf",
-                        mime="application/pdf"
-                    )
-
-    except Exception as e:
-        st.error(f"Error processing file: {e}")
+                    st
