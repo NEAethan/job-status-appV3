@@ -49,6 +49,9 @@ if uploaded_file is not None:
         registration = st.text_input("Aircraft Registration")
         serial_number = st.text_input("Aircraft Serial Number")
 
+        notes = st.text_area("Notes")
+
+
         # PDF export using enhanced layout
 if st.button("Export Results as PDF"):
     pdf_path = ext.generate_pdf_with_pie_and_legend(
@@ -67,6 +70,7 @@ if st.button("Export Results as PDF"):
             file_name="job_status_completion_report.pdf",
             mime="application/pdf"
         )
+
 
 
     except Exception as e:
