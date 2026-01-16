@@ -19,7 +19,7 @@ notes = st.text_area("Notes")
 # Helper: Find Status Column
 # ---------------------------
 def find_status_column(df):
-    possible_columns = ["status", "Status", "M", "M1"]
+    possible_columns = ["Status", "status", "M", "M1"]
     for col in df.columns:
         if col in possible_columns:
             return col
@@ -41,24 +41,20 @@ if uploaded_file is not None:
                 ext.calculate_status_metrics(df, status_column)
             )
 
-            # ---------------------------
-            # Display Results
-            # ---------------------------
+            # Display table
             st.subheader("Status Breakdown")
-
             results_df = pd.DataFrame(
                 results, columns=["Status", "Jobs", "Percentage (%)"]
             )
             st.dataframe(results_df, use_container_width=True)
 
+            # Overall completion
             st.metric(
                 label="Overall Completion Percentage",
                 value=f"{round(overall_completion, 2)}%"
             )
 
-            # ---------------------------
-            # PDF Export
-            # ---------------------------
+            # Export PDF
             st.subheader("Export Report")
 
             if st.button("Export Results as PDF"):
@@ -82,5 +78,3 @@ if uploaded_file is not None:
 
     except Exception as e:
         st.error(f"Error processing file: {e}")
-
-
