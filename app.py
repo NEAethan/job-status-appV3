@@ -1,6 +1,8 @@
 import pandas as pd
 import streamlit as st
 import app_extensions
+import app_extensions_v2 as ext
+
 
 st.set_page_config(page_title="Job Status Completion", layout="centered")
 
@@ -48,22 +50,24 @@ if uploaded_file is not None:
         serial_number = st.text_input("Aircraft Serial Number")
 
         # PDF export using enhanced layout
-        if st.button("Export Results as PDF"):
-            pdf_path = app_extensions.generate_enhanced_pdf(
-                results=results,
-                overall_completion=overall_completion,
-                completed_jobs=completed_jobs,
-                total_jobs=total_jobs,
-                registration=registration,
-                serial_number=serial_number
-            )
-            with open(pdf_path, "rb") as f:
-                st.download_button(
-                    label="Download Enhanced PDF",
-                    data=f,
-                    file_name="job_status_completion_report.pdf",
-                    mime="application/pdf"
-                )
+if st.button("Export Results as PDF"):
+    pdf_path = ext.generate_pdf_with_pie_and_legend(
+        results=results,
+        overall_completion=overall_completion,
+        completed_jobs=completed_jobs,
+        total_jobs=total_jobs,
+        registration=registration,
+        serial_number=serial_number,
+        notes=notes
+    )
+    with open(pdf_path, "rb") as f:
+        st.download_button(
+            label="Download Enhanced PDF",
+            data=f,
+            file_name="job_status_completion_report.pdf",
+            mime="application/pdf"
+        )
+
 
     except Exception as e:
         st.error(f"Error reading file: {e}")
