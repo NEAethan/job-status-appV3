@@ -71,4 +71,12 @@ if uploaded_file is not None:
                 )
 
                 with open(pdf_path, "rb") as f:
-                    st
+                    st.download_button(
+                        label="Download PDF Report",
+                        data=f,
+                        file_name="job_status_completion_report.pdf",
+                        mime="application/pdf"
+                    )
+
+    except Exception as e:
+        st.error(f"Error processing file: {e}")
