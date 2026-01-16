@@ -160,4 +160,3 @@ def generate_pdf_with_pie_and_legend(
     pdf.build(elements)
 
     return tmp.name
-
