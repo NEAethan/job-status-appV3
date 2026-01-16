@@ -26,6 +26,9 @@ COMPLETED_STATUSES = [
     "Manager Reviewed",
     "QA Reviewed",
 ]
+# --- User inputs for aircraft info ---
+registration = st.text_input("Aircraft Registration")
+serial_number = st.text_input("Aircraft Serial Number")
 
 # Normalize expected statuses to lowercase for matching
 EXPECTED_STATUSES_LOWER = [s.lower() for s in EXPECTED_STATUSES]
