@@ -116,15 +116,23 @@ if uploaded_file is not None:
 
             return tmp_file.name
 
-        if st.button("Export Results as PDF"):
-            pdf_path = generate_pdf()
-            with open(pdf_path, "rb") as f:
-                st.download_button(
-                    label="Download PDF",
-                    data=f,
-                    file_name="job_status_completion_report.pdf",
-                    mime="application/pdf"
-                )
+    if st.button("Export Results as PDF"):
+    pdf_path = app_extensions.generate_enhanced_pdf(
+        results=result_df.values.tolist(),   # pass status, jobs, percentage
+        overall_completion=overall_completion,
+        completed_jobs=completed_jobs,
+        total_jobs=total_jobs,
+        registration=registration,
+        serial_number=serial_number
+    )
+    with open(pdf_path, "rb") as f:
+        st.download_button(
+            label="Download Enhanced PDF",
+            data=f,
+            file_name="job_status_completion_report.pdf",
+            mime="application/pdf"
+        )
+
 
     except Exception as e:
         st.error(f"Error reading file: {e}")
