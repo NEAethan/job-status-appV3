@@ -1,7 +1,7 @@
 import pandas as pd
 import tempfile
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Flowable
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import LETTER
@@ -34,11 +34,11 @@ STATUS_COLORS = [
     colors.HexColor("#9013FE")
 ]
 
-# Example job log text (acts as placeholder)
+# Job log text (placeholder – replace with logo later if desired)
 INDEED_JOB_LOG = (
-    "Northeast Air | Portland, ME\n"
-    "Job activity summary reference\n"
-    "Source: Indeed"
+    "<b>Northeast Air</b><br/>"
+    "Portland, ME<br/>"
+    "Job Status Activity Summary"
 )
 
 # ---------------------------
@@ -46,7 +46,6 @@ INDEED_JOB_LOG = (
 # ---------------------------
 def calculate_status_metrics(df, status_column):
     total_jobs = len(df)
-
     statuses = df[status_column].astype(str).str.strip().str.lower()
     counts = statuses.value_counts()
 
@@ -65,24 +64,6 @@ def calculate_status_metrics(df, status_column):
     return results, overall_completion, completed, total_jobs
 
 # ---------------------------
-# Custom Legend
-# ---------------------------
-class Legend(Flowable):
-    def __init__(self, labels, colors):
-        Flowable.__init__(self)
-        self.labels = labels
-        self.colors = colors
-
-    def draw(self):
-        x = 0
-        for label, color in zip(self.labels, self.colors):
-            self.canv.setFillColor(color)
-            self.canv.rect(x, 0, 10, 10, fill=1)
-            self.canv.setFillColor(colors.black)
-            self.canv.drawString(x + 14, 0, label)
-            x += 100
-
-# ---------------------------
 # PDF Generation
 # ---------------------------
 def generate_pdf_with_pie_and_legend(
@@ -97,16 +78,16 @@ def generate_pdf_with_pie_and_legend(
     styles = getSampleStyleSheet()
     styles.add(
         ParagraphStyle(
-            "TitleStyle",
-            fontSize=16,
+            "Header",
+            fontSize=14,
             textColor=colors.darkblue,
-            spaceAfter=12
+            spaceAfter=10
         )
     )
 
     elements = []
 
-    # Job log (top-left)
+    # Header / Job log
     elements.append(Paragraph(INDEED_JOB_LOG, styles["Normal"]))
     elements.append(Spacer(1, 12))
 
@@ -126,28 +107,26 @@ def generate_pdf_with_pie_and_legend(
 
     elements.append(Spacer(1, 12))
 
-    # Table
+    # Status table
     table_data = [["Status", "Jobs", "Percentage (%)"]] + [
         [r[0], str(r[1]), str(r[2])] for r in results
     ]
 
     table = Table(table_data)
-    table.setStyle(
-        TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-            ("GRID", (0, 0), (-1, -1), 0.75, colors.grey),
-            ("ALIGN", (1, 1), (-1, -1), "CENTER"),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ])
-    )
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+        ("GRID", (0, 0), (-1, -1), 0.75, colors.grey),
+        ("ALIGN", (1, 1), (-1, -1), "CENTER"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+    ]))
 
     elements.append(table)
-    elements.append(Spacer(1, 12))
+    elements.append(Spacer(1, 14))
 
     # Pie chart
     drawing = Drawing(300, 200)
     pie = Pie()
-    pie.x = 100
+    pie.x = 90
     pie.y = 10
     pie.width = 150
     pie.height = 150
@@ -159,15 +138,22 @@ def generate_pdf_with_pie_and_legend(
 
     drawing.add(pie)
     elements.append(drawing)
+    elements.append(Spacer(1, 10))
 
-    # Legend
-    elements.append(Spacer(1, 8))
-    elements.append(
-        Legend(
-            labels=[r[0] for r in results],
-            colors=STATUS_COLORS[:len(results)]
+    # Legend (SAFE TABLE VERSION)
+    legend_data = []
+    for label, color in zip([r[0] for r in results], STATUS_COLORS):
+        legend_data.append(
+            [Paragraph(" ", styles["Normal"]), label]
         )
-    )
+
+    legend_table = Table(legend_data, colWidths=[20, 200])
+    legend_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.lightgrey),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.white),
+    ]))
+
+    elements.append(legend_table)
 
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     pdf = SimpleDocTemplate(tmp.name, pagesize=LETTER)
