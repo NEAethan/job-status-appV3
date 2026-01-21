@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use("Agg")
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -31,7 +34,6 @@ if st.button("Process CSV"):
         try:
             df = pd.read_csv(uploaded_file)
 
-            # Find status column
             status_col = None
             for col in df.columns:
                 if col.lower() in ["status", "m", "m1"]:
@@ -106,6 +108,10 @@ if st.button("Export PDF"):
                 file_name="job_status_report.pdf",
                 mime="application/pdf"
             )
+
+        except Exception as e:
+            st.error(f"PDF generation failed: {e}")
+
 
         except Exception as e:
             st.error(f"PDF generation failed: {e}")
