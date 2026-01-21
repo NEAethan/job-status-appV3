@@ -1,14 +1,13 @@
 import matplotlib
-matplotlib.use("Agg")  # Required for headless environments
-
+matplotlib.use("Agg")  # For headless environments (Streamlit Cloud)
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.pagesizes import LETTER
-from reportlab.lib import colors
 from io import BytesIO
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
+from reportlab.lib.pagesizes import LETTER
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
 
 st.set_page_config(page_title="Job Status Report", layout="wide")
 st.title("Job Status Report Generator")
@@ -22,7 +21,7 @@ serial_number = st.text_input("Aircraft Serial Number")
 notes = st.text_area("Notes")
 
 # -----------------------------
-# SESSION STATE FOR RESULTS
+# SESSION STATE
 # -----------------------------
 if "status_counts" not in st.session_state:
     st.session_state.status_counts = None
@@ -36,7 +35,7 @@ if "completion_percent" not in st.session_state:
     st.session_state.completion_percent = None
 
 # -----------------------------
-# PROCESS CSV BUTTON
+# PROCESS CSV
 # -----------------------------
 if st.button("Process CSV"):
     if uploaded_file is None:
@@ -46,7 +45,7 @@ if st.button("Process CSV"):
             df = pd.read_csv(uploaded_file)
             st.session_state.total_jobs = len(df)
 
-            # Find status column
+            # Detect status column
             status_col = None
             for col in df.columns:
                 if col.lower() in ["status", "m", "m1"]:
@@ -58,7 +57,7 @@ if st.button("Process CSV"):
             else:
                 statuses_lower = df[status_col].astype(str).str.lower()
 
-                # Count occurrences (case-insensitive)
+                # Count occurrences
                 st.session_state.status_counts = {
                     "Open": statuses_lower.str.contains("open").sum(),
                     "Pending": statuses_lower.str.contains("pending").sum(),
@@ -67,20 +66,20 @@ if st.button("Process CSV"):
                     "QA Reviewed": statuses_lower.str.contains("qa reviewed").sum(),
                 }
 
-                # Calculate percentages for each status
+                # Percentages per status
                 st.session_state.status_percentages = {
                     k: round(v / st.session_state.total_jobs * 100, 1)
                     for k, v in st.session_state.status_counts.items()
                 }
 
-                # Calculate overall completion
+                # Overall completion
                 completed = sum(
                     st.session_state.status_counts[k]
                     for k in ["Lead Reviewed", "Manager Review", "QA Reviewed"]
                 )
                 st.session_state.completion_percent = round(completed / st.session_state.total_jobs * 100, 1)
 
-                # Store DataFrame for display and PDF table
+                # DataFrame for table
                 st.session_state.df_processed = pd.DataFrame(
                     {
                         "Status": list(st.session_state.status_counts.keys()),
@@ -95,7 +94,7 @@ if st.button("Process CSV"):
             st.error(f"Error processing CSV: {e}")
 
 # -----------------------------
-# DISPLAY JOB COMPLETION SUMMARY
+# DISPLAY SUMMARY
 # -----------------------------
 if st.session_state.status_percentages:
     st.subheader("Job Completion Summary")
@@ -109,10 +108,11 @@ if st.session_state.status_counts:
     st.subheader("Job Status Breakdown")
 
     fig, ax = plt.subplots(figsize=(8,5))
+    colors_list = ["#d62728", "#ff7f0e", "#1f77b4", "#1f77b4", "#2ca02c"]  # Open/Pending red/orange, others blue/green
     bars = ax.bar(
         st.session_state.status_counts.keys(),
         st.session_state.status_counts.values(),
-        color=["#d62728", "#ff7f0e", "#1f77b4", "#1f77b4", "#2ca02c"],  # Open/ Pending red/orange, others green/blue
+        color=colors_list
     )
 
     # Add value labels
@@ -131,17 +131,14 @@ if st.session_state.status_counts:
     ax.yaxis.grid(True, linestyle='--', alpha=0.7)
     plt.xticks(rotation=30, ha='right')
     plt.tight_layout()
-
     st.pyplot(fig)
 
-    # -----------------------------
-    # DISPLAY TABLE
-    # -----------------------------
+    # Display table
     st.subheader("Job Status Table")
     st.table(st.session_state.df_processed)
 
 # -----------------------------
-# PDF GENERATION BUTTON
+# PDF GENERATION
 # -----------------------------
 if st.button("Export PDF"):
     if not st.session_state.status_counts:
@@ -157,24 +154,23 @@ if st.button("Export PDF"):
             elements.append(Paragraph("Job Status Report", styles["Title"]))
             elements.append(Spacer(1, 12))
 
-            # Aircraft info
+            # Aircraft info & completion
             elements.append(Paragraph(f"Aircraft Registration: {registration}", styles["Normal"]))
             elements.append(Paragraph(f"Serial Number: {serial_number}", styles["Normal"]))
-            elements.append(Spacer(1, 12))
-
-            # Overall completion
+            elements.append(Spacer(1, 6))
             elements.append(Paragraph(f"Total Jobs: {st.session_state.total_jobs}", styles["Normal"]))
             elements.append(Paragraph(f"Overall Completion %: {st.session_state.completion_percent}%", styles["Normal"]))
             elements.append(Spacer(1, 12))
 
             # -----------------------------
-            # Add Bar Chart to PDF
+            # Bar chart for PDF
             # -----------------------------
             fig, ax = plt.subplots(figsize=(6,4))
+            colors_list = ["#d62728", "#ff7f0e", "#1f77b4", "#1f77b4", "#2ca02c"]
             bars = ax.bar(
                 st.session_state.status_counts.keys(),
                 st.session_state.status_counts.values(),
-                color=["#d62728", "#ff7f0e", "#1f77b4", "#1f77b4", "#2ca02c"],
+                color=colors_list
             )
             for bar in bars:
                 height = bar.get_height()
@@ -198,7 +194,7 @@ if st.button("Export PDF"):
             elements.append(Spacer(1, 12))
 
             # -----------------------------
-            # Add Table to PDF
+            # Table for PDF
             # -----------------------------
             table_data = [["Status", "Count", "Percentage (%)"]] + st.session_state.df_processed.values.tolist()
             pdf_table = Table(table_data, hAlign='LEFT')
@@ -214,7 +210,7 @@ if st.button("Export PDF"):
             elements.append(pdf_table)
             elements.append(Spacer(1, 12))
 
-            # Notes
+            # Notes section
             elements.append(Paragraph("Notes", styles["Heading2"]))
             elements.append(Paragraph(notes or "N/A", styles["Normal"]))
 
