@@ -32,6 +32,8 @@ if "df_processed" not in st.session_state:
     st.session_state.df_processed = None
 if "total_jobs" not in st.session_state:
     st.session_state.total_jobs = None
+if "completion_percent" not in st.session_state:
+    st.session_state.completion_percent = None
 
 # -----------------------------
 # PROCESS CSV BUTTON
@@ -54,21 +56,29 @@ if st.button("Process CSV"):
             if status_col is None:
                 st.error("No Status column found.")
             else:
-                statuses = df[status_col].astype(str).str.lower()
+                statuses_lower = df[status_col].astype(str).str.lower()
 
                 # Count occurrences (case-insensitive)
                 st.session_state.status_counts = {
-                    "Lead Reviewed": statuses.str.contains("lead reviewed").sum(),
-                    "Manager Review": statuses.str.contains("manager review").sum(),
-                    "QA Reviewed": statuses.str.contains("qa reviewed").sum(),
-                    "Complete": statuses.str.contains("complete").sum(),
+                    "Open": statuses_lower.str.contains("open").sum(),
+                    "Pending": statuses_lower.str.contains("pending").sum(),
+                    "Lead Reviewed": statuses_lower.str.contains("lead reviewed").sum(),
+                    "Manager Review": statuses_lower.str.contains("manager review").sum(),
+                    "QA Reviewed": statuses_lower.str.contains("qa reviewed").sum(),
                 }
 
-                # Calculate percentages
+                # Calculate percentages for each status
                 st.session_state.status_percentages = {
                     k: round(v / st.session_state.total_jobs * 100, 1)
                     for k, v in st.session_state.status_counts.items()
                 }
+
+                # Calculate overall completion
+                completed = sum(
+                    st.session_state.status_counts[k]
+                    for k in ["Lead Reviewed", "Manager Review", "QA Reviewed"]
+                )
+                st.session_state.completion_percent = round(completed / st.session_state.total_jobs * 100, 1)
 
                 # Store DataFrame for display and PDF table
                 st.session_state.df_processed = pd.DataFrame(
@@ -89,9 +99,7 @@ if st.button("Process CSV"):
 # -----------------------------
 if st.session_state.status_percentages:
     st.subheader("Job Completion Summary")
-    total_completed = st.session_state.status_counts.get("Complete", 0)
-    completion_percent = round(total_completed / st.session_state.total_jobs * 100, 1)
-    st.metric("Overall Completion %", f"{completion_percent}%")
+    st.metric("Overall Completion %", f"{st.session_state.completion_percent}%")
     st.write(f"Total Jobs: {st.session_state.total_jobs}")
 
 # -----------------------------
@@ -104,7 +112,7 @@ if st.session_state.status_counts:
     bars = ax.bar(
         st.session_state.status_counts.keys(),
         st.session_state.status_counts.values(),
-        color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"],
+        color=["#d62728", "#ff7f0e", "#1f77b4", "#1f77b4", "#2ca02c"],  # Open/ Pending red/orange, others green/blue
     )
 
     # Add value labels
@@ -156,9 +164,7 @@ if st.button("Export PDF"):
 
             # Overall completion
             elements.append(Paragraph(f"Total Jobs: {st.session_state.total_jobs}", styles["Normal"]))
-            elements.append(Paragraph(
-                f"Overall Completion %: {completion_percent}%", styles["Normal"]
-            ))
+            elements.append(Paragraph(f"Overall Completion %: {st.session_state.completion_percent}%", styles["Normal"]))
             elements.append(Spacer(1, 12))
 
             # -----------------------------
@@ -168,7 +174,7 @@ if st.button("Export PDF"):
             bars = ax.bar(
                 st.session_state.status_counts.keys(),
                 st.session_state.status_counts.values(),
-                color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"],
+                color=["#d62728", "#ff7f0e", "#1f77b4", "#1f77b4", "#2ca02c"],
             )
             for bar in bars:
                 height = bar.get_height()
