@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use("Agg")  # Required for headless environments like Streamlit Cloud
+matplotlib.use("Agg")  # Required for headless environments
 
 import streamlit as st
 import pandas as pd
@@ -26,8 +26,12 @@ notes = st.text_area("Notes")
 # -----------------------------
 if "status_counts" not in st.session_state:
     st.session_state.status_counts = None
+if "status_percentages" not in st.session_state:
+    st.session_state.status_percentages = None
 if "df_processed" not in st.session_state:
     st.session_state.df_processed = None
+if "total_jobs" not in st.session_state:
+    st.session_state.total_jobs = None
 
 # -----------------------------
 # PROCESS CSV BUTTON
@@ -38,6 +42,7 @@ if st.button("Process CSV"):
     else:
         try:
             df = pd.read_csv(uploaded_file)
+            st.session_state.total_jobs = len(df)
 
             # Find status column
             status_col = None
@@ -51,7 +56,7 @@ if st.button("Process CSV"):
             else:
                 statuses = df[status_col].astype(str).str.lower()
 
-                # Count occurrences
+                # Count occurrences (case-insensitive)
                 st.session_state.status_counts = {
                     "Lead Reviewed": statuses.str.contains("lead reviewed").sum(),
                     "Manager Review": statuses.str.contains("manager review").sum(),
@@ -59,10 +64,19 @@ if st.button("Process CSV"):
                     "Complete": statuses.str.contains("complete").sum(),
                 }
 
-                # Store processed DataFrame for PDF table
+                # Calculate percentages
+                st.session_state.status_percentages = {
+                    k: round(v / st.session_state.total_jobs * 100, 1)
+                    for k, v in st.session_state.status_counts.items()
+                }
+
+                # Store DataFrame for display and PDF table
                 st.session_state.df_processed = pd.DataFrame(
-                    list(st.session_state.status_counts.items()),
-                    columns=["Status", "Count"]
+                    {
+                        "Status": list(st.session_state.status_counts.keys()),
+                        "Count": list(st.session_state.status_counts.values()),
+                        "Percentage": list(st.session_state.status_percentages.values()),
+                    }
                 )
 
                 st.success("CSV processed successfully.")
@@ -71,13 +85,22 @@ if st.button("Process CSV"):
             st.error(f"Error processing CSV: {e}")
 
 # -----------------------------
+# DISPLAY JOB COMPLETION SUMMARY
+# -----------------------------
+if st.session_state.status_percentages:
+    st.subheader("Job Completion Summary")
+    total_completed = st.session_state.status_counts.get("Complete", 0)
+    completion_percent = round(total_completed / st.session_state.total_jobs * 100, 1)
+    st.metric("Overall Completion %", f"{completion_percent}%")
+    st.write(f"Total Jobs: {st.session_state.total_jobs}")
+
+# -----------------------------
 # DISPLAY BAR GRAPH
 # -----------------------------
 if st.session_state.status_counts:
     st.subheader("Job Status Breakdown")
 
     fig, ax = plt.subplots(figsize=(8,5))
-
     bars = ax.bar(
         st.session_state.status_counts.keys(),
         st.session_state.status_counts.values(),
@@ -93,7 +116,6 @@ if st.session_state.status_counts:
                     textcoords="offset points",
                     ha='center', va='bottom', fontsize=10)
 
-    # Styling
     ax.set_ylabel("Number of Jobs")
     ax.set_xlabel("Status")
     ax.set_title("Job Status Summary", fontsize=14, fontweight='bold')
@@ -132,6 +154,13 @@ if st.button("Export PDF"):
             elements.append(Paragraph(f"Serial Number: {serial_number}", styles["Normal"]))
             elements.append(Spacer(1, 12))
 
+            # Overall completion
+            elements.append(Paragraph(f"Total Jobs: {st.session_state.total_jobs}", styles["Normal"]))
+            elements.append(Paragraph(
+                f"Overall Completion %: {completion_percent}%", styles["Normal"]
+            ))
+            elements.append(Spacer(1, 12))
+
             # -----------------------------
             # Add Bar Chart to PDF
             # -----------------------------
@@ -156,7 +185,6 @@ if st.button("Export PDF"):
             plt.xticks(rotation=30, ha='right')
             plt.tight_layout()
 
-            # Save chart to BytesIO
             chart_buffer = BytesIO()
             fig.savefig(chart_buffer, format='PNG', bbox_inches='tight')
             chart_buffer.seek(0)
@@ -166,7 +194,7 @@ if st.button("Export PDF"):
             # -----------------------------
             # Add Table to PDF
             # -----------------------------
-            table_data = [["Status", "Count"]] + st.session_state.df_processed.values.tolist()
+            table_data = [["Status", "Count", "Percentage (%)"]] + st.session_state.df_processed.values.tolist()
             pdf_table = Table(table_data, hAlign='LEFT')
             pdf_table.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (-1,0), colors.grey),
@@ -184,7 +212,6 @@ if st.button("Export PDF"):
             elements.append(Paragraph("Notes", styles["Heading2"]))
             elements.append(Paragraph(notes or "N/A", styles["Normal"]))
 
-            # Build PDF
             doc.build(elements)
 
             st.download_button(
