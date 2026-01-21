@@ -9,9 +9,6 @@ from reportlab.lib import colors
 from reportlab.graphics.charts.piecharts import Pie
 from reportlab.graphics.shapes import Drawing
 
-# ---------------------------
-# Status Definitions
-# ---------------------------
 EXPECTED_STATUSES = [
     "Open",
     "Pending",
@@ -34,7 +31,6 @@ STATUS_COLORS = [
     colors.HexColor("#9013FE")
 ]
 
-# Job log text (placeholder – replace with logo later if desired)
 INDEED_JOB_LOG = (
     "<b>Northeast Air</b><br/>"
     "Portland, ME<br/>"
@@ -42,7 +38,7 @@ INDEED_JOB_LOG = (
 )
 
 # ---------------------------
-# Metrics Calculation
+# Metrics
 # ---------------------------
 def calculate_status_metrics(df, status_column):
     total_jobs = len(df)
@@ -56,15 +52,13 @@ def calculate_status_metrics(df, status_column):
         percent = (count / total_jobs) * 100 if total_jobs else 0
         results.append((status, count, round(percent, 2)))
 
-    completed = sum(
-        counts.get(s.lower(), 0) for s in COMPLETED_STATUSES
-    )
+    completed = sum(counts.get(s.lower(), 0) for s in COMPLETED_STATUSES)
     overall_completion = (completed / total_jobs) * 100 if total_jobs else 0
 
     return results, overall_completion, completed, total_jobs
 
 # ---------------------------
-# PDF Generation
+# PDF
 # ---------------------------
 def generate_pdf_with_pie_and_legend(
     results,
@@ -76,40 +70,26 @@ def generate_pdf_with_pie_and_legend(
     notes
 ):
     styles = getSampleStyleSheet()
-    styles.add(
-        ParagraphStyle(
-            "Header",
-            fontSize=14,
-            textColor=colors.darkblue,
-            spaceAfter=10
-        )
-    )
+    styles.add(ParagraphStyle("Header", fontSize=14, spaceAfter=10))
 
     elements = []
 
-    # Header / Job log
+    # Header
     elements.append(Paragraph(INDEED_JOB_LOG, styles["Normal"]))
     elements.append(Spacer(1, 12))
 
-    # Aircraft info
-    elements.append(
-        Paragraph(f"<b>Aircraft Registration:</b> {registration}", styles["Normal"])
-    )
-    elements.append(
-        Paragraph(f"<b>Aircraft Serial Number:</b> {serial_number}", styles["Normal"])
-    )
+    elements.append(Paragraph(f"<b>Aircraft Registration:</b> {registration}", styles["Normal"]))
+    elements.append(Paragraph(f"<b>Aircraft Serial Number:</b> {serial_number}", styles["Normal"]))
 
     if notes:
         elements.append(Spacer(1, 6))
-        elements.append(
-            Paragraph(f"<b>Notes:</b><br/>{notes}", styles["Normal"])
-        )
+        elements.append(Paragraph(f"<b>Notes:</b><br/>{notes}", styles["Normal"]))
 
     elements.append(Spacer(1, 12))
 
-    # Status table
+    # Table
     table_data = [["Status", "Jobs", "Percentage (%)"]] + [
-        [r[0], str(r[1]), str(r[2])] for r in results
+        [r[0], r[1], r[2]] for r in results
     ]
 
     table = Table(table_data)
@@ -121,39 +101,50 @@ def generate_pdf_with_pie_and_legend(
     ]))
 
     elements.append(table)
-    elements.append(Spacer(1, 14))
+    elements.append(Spacer(1, 16))
 
-    # Pie chart
-    drawing = Drawing(300, 200)
-    pie = Pie()
-    pie.x = 90
-    pie.y = 10
-    pie.width = 150
-    pie.height = 150
-    pie.data = [r[1] for r in results]
-    pie.labels = [""] * len(results)
+    # ---------------------------
+    # SAFE PIE CHART
+    # ---------------------------
+    values = [r[1] for r in results]
 
-    for i, slice_ in enumerate(pie.slices):
-        slice_.fillColor = STATUS_COLORS[i]
+    if sum(values) > 0:
+        drawing = Drawing(300, 200)
+        pie = Pie()
+        pie.x = 90
+        pie.y = 10
+        pie.width = 150
+        pie.height = 150
+        pie.data = values
+        pie.labels = [""] * len(values)
 
-    drawing.add(pie)
-    elements.append(drawing)
-    elements.append(Spacer(1, 10))
+        for i, slice_ in enumerate(pie.slices):
+            slice_.fillColor = STATUS_COLORS[i % len(STATUS_COLORS)]
 
-    # Legend (SAFE TABLE VERSION)
-    legend_data = []
-    for label, color in zip([r[0] for r in results], STATUS_COLORS):
-        legend_data.append(
-            [Paragraph(" ", styles["Normal"]), label]
+        drawing.add(pie)
+        elements.append(drawing)
+        elements.append(Spacer(1, 10))
+
+        # Legend
+        legend_data = []
+        for i, r in enumerate(results):
+            legend_data.append(["■", r[0]])
+
+        legend = Table(legend_data, colWidths=[20, 200])
+        legend.setStyle(TableStyle([
+            ("TEXTCOLOR", (0, 0), (0, -1), colors.black),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.white),
+        ]))
+
+        elements.append(legend)
+
+    else:
+        elements.append(
+            Paragraph(
+                "<i>No status data available to display chart.</i>",
+                styles["Normal"]
+            )
         )
-
-    legend_table = Table(legend_data, colWidths=[20, 200])
-    legend_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, -1), colors.lightgrey),
-        ("GRID", (0, 0), (-1, -1), 0.25, colors.white),
-    ]))
-
-    elements.append(legend_table)
 
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     pdf = SimpleDocTemplate(tmp.name, pagesize=LETTER)
