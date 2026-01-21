@@ -1,12 +1,13 @@
 import matplotlib
-matplotlib.use("Agg")  # Important for Streamlit Cloud headless environment
+matplotlib.use("Agg")  # Required for headless environments like Streamlit Cloud
 
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import LETTER
+from reportlab.lib import colors
 from io import BytesIO
 
 st.set_page_config(page_title="Job Status Report", layout="wide")
@@ -20,9 +21,13 @@ registration = st.text_input("Aircraft Registration")
 serial_number = st.text_input("Aircraft Serial Number")
 notes = st.text_area("Notes")
 
-# Session storage for results
+# -----------------------------
+# SESSION STATE FOR RESULTS
+# -----------------------------
 if "status_counts" not in st.session_state:
     st.session_state.status_counts = None
+if "df_processed" not in st.session_state:
+    st.session_state.df_processed = None
 
 # -----------------------------
 # PROCESS CSV BUTTON
@@ -46,13 +51,19 @@ if st.button("Process CSV"):
             else:
                 statuses = df[status_col].astype(str).str.lower()
 
-                # Count occurrences (case-insensitive)
+                # Count occurrences
                 st.session_state.status_counts = {
                     "Lead Reviewed": statuses.str.contains("lead reviewed").sum(),
                     "Manager Review": statuses.str.contains("manager review").sum(),
                     "QA Reviewed": statuses.str.contains("qa reviewed").sum(),
                     "Complete": statuses.str.contains("complete").sum(),
                 }
+
+                # Store processed DataFrame for PDF table
+                st.session_state.df_processed = pd.DataFrame(
+                    list(st.session_state.status_counts.items()),
+                    columns=["Status", "Count"]
+                )
 
                 st.success("CSV processed successfully.")
 
@@ -65,16 +76,15 @@ if st.button("Process CSV"):
 if st.session_state.status_counts:
     st.subheader("Job Status Breakdown")
 
-    # Professional bar chart
     fig, ax = plt.subplots(figsize=(8,5))
 
     bars = ax.bar(
         st.session_state.status_counts.keys(),
         st.session_state.status_counts.values(),
-        color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"],  # professional colors
+        color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"],
     )
 
-    # Add value labels on top of bars
+    # Add value labels
     for bar in bars:
         height = bar.get_height()
         ax.annotate(f'{height}',
@@ -88,11 +98,17 @@ if st.session_state.status_counts:
     ax.set_xlabel("Status")
     ax.set_title("Job Status Summary", fontsize=14, fontweight='bold')
     ax.set_ylim(0, max(st.session_state.status_counts.values()) * 1.2)
-    ax.yaxis.grid(True, linestyle='--', alpha=0.7)  # horizontal gridlines
-    plt.xticks(rotation=30, ha='right')  # rotate labels to avoid overlap
+    ax.yaxis.grid(True, linestyle='--', alpha=0.7)
+    plt.xticks(rotation=30, ha='right')
     plt.tight_layout()
 
     st.pyplot(fig)
+
+    # -----------------------------
+    # DISPLAY TABLE
+    # -----------------------------
+    st.subheader("Job Status Table")
+    st.table(st.session_state.df_processed)
 
 # -----------------------------
 # PDF GENERATION BUTTON
@@ -116,10 +132,52 @@ if st.button("Export PDF"):
             elements.append(Paragraph(f"Serial Number: {serial_number}", styles["Normal"]))
             elements.append(Spacer(1, 12))
 
-            # Status counts
-            for k, v in st.session_state.status_counts.items():
-                elements.append(Paragraph(f"{k}: {v}", styles["Normal"]))
+            # -----------------------------
+            # Add Bar Chart to PDF
+            # -----------------------------
+            fig, ax = plt.subplots(figsize=(6,4))
+            bars = ax.bar(
+                st.session_state.status_counts.keys(),
+                st.session_state.status_counts.values(),
+                color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"],
+            )
+            for bar in bars:
+                height = bar.get_height()
+                ax.annotate(f'{height}',
+                            xy=(bar.get_x() + bar.get_width() / 2, height),
+                            xytext=(0, 3),
+                            textcoords="offset points",
+                            ha='center', va='bottom', fontsize=10)
+            ax.set_ylabel("Number of Jobs")
+            ax.set_xlabel("Status")
+            ax.set_title("Job Status Summary", fontsize=12, fontweight='bold')
+            ax.set_ylim(0, max(st.session_state.status_counts.values()) * 1.2)
+            ax.yaxis.grid(True, linestyle='--', alpha=0.7)
+            plt.xticks(rotation=30, ha='right')
+            plt.tight_layout()
 
+            # Save chart to BytesIO
+            chart_buffer = BytesIO()
+            fig.savefig(chart_buffer, format='PNG', bbox_inches='tight')
+            chart_buffer.seek(0)
+            elements.append(Image(chart_buffer, width=400, height=250))
+            elements.append(Spacer(1, 12))
+
+            # -----------------------------
+            # Add Table to PDF
+            # -----------------------------
+            table_data = [["Status", "Count"]] + st.session_state.df_processed.values.tolist()
+            pdf_table = Table(table_data, hAlign='LEFT')
+            pdf_table.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.grey),
+                ('TEXTCOLOR',(0,0),(-1,0),colors.whitesmoke),
+                ('ALIGN',(0,0),(-1,-1),'CENTER'),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('BOTTOMPADDING', (0,0), (-1,0), 8),
+                ('BACKGROUND',(0,1),(-1,-1), colors.beige),
+                ('GRID', (0,0), (-1,-1), 1, colors.black)
+            ]))
+            elements.append(pdf_table)
             elements.append(Spacer(1, 12))
 
             # Notes
@@ -129,7 +187,6 @@ if st.button("Export PDF"):
             # Build PDF
             doc.build(elements)
 
-            # Download button
             st.download_button(
                 "Download PDF",
                 data=buffer.getvalue(),
